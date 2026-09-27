@@ -115,7 +115,21 @@ class _ShoeScreenState extends State<ShoeScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text('Heel pressure elevated — shift weight', style: TextStyle(fontSize: 10.4, color: AppColors.muted)),
+                        Builder(
+                          builder: (context) {
+                            String pressureMsg = 'Pressure normal';
+                            if (shoeData.heelPressure > 50) {
+                              pressureMsg = 'Heel pressure elevated — shift weight';
+                            } else if (shoeData.toePressure > 50) {
+                              pressureMsg = 'Toe pressure elevated — shift weight';
+                            } else if (shoeData.midfootPressure > 50) {
+                              pressureMsg = 'Midfoot pressure elevated — shift weight';
+                            } else if (shoeData.heelPressure == 0 && shoeData.toePressure == 0) {
+                              pressureMsg = 'No foot detected';
+                            }
+                            return Text(pressureMsg, style: const TextStyle(fontSize: 10.4, color: AppColors.muted));
+                          }
+                        ),
                       ],
                     ),
                   ),
@@ -133,39 +147,11 @@ class _ShoeScreenState extends State<ShoeScreen> {
                   children: [
                     MiniCard(label: 'Humidity', value: '${shoeData.humidityPct.toStringAsFixed(0)}% RH'),
                     const SizedBox(width: 12),
-                    const MiniCard(label: 'Battery', value: '76%'),
-                  ],
-                ),
-                const SectionLabel('In-shoe Vapor'),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: const Text(
-                            'Micro-atomizer',
-                            style: TextStyle(fontSize: 12.8, fontWeight: FontWeight.w600, color: AppColors.text),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Pill(text: 'Standby', color: AppColors.safe, bgColor: AppColors.safe.withValues(alpha: 0.15)),
-                      ],
+                    MiniCard(
+                      label: 'Status', 
+                      value: (_isLeftSelected ? snapshot.isLeftConnected : snapshot.isRightConnected) ? 'Online' : 'Offline'
                     ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                GhostButton(
-                  text: 'Trigger Manual Mist',
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Manual mist activated for ${_isLeftSelected ? 'Left' : 'Right'} shoe.'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
+                  ],
                 ),
                 const SizedBox(height: 24),
               ],
