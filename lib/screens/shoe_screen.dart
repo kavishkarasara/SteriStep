@@ -12,8 +12,24 @@ class ShoeScreen extends StatefulWidget {
   State<ShoeScreen> createState() => _ShoeScreenState();
 }
 
-class _ShoeScreenState extends State<ShoeScreen> {
+class _ShoeScreenState extends State<ShoeScreen> with SingleTickerProviderStateMixin {
   bool _isLeftSelected = false; // Default to Right Foot
+  late AnimationController _scannerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scannerController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _scannerController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +119,7 @@ class _ShoeScreenState extends State<ShoeScreen> {
                                 child: Image.asset('lib/assets/foot.png', height: 240, fit: BoxFit.contain),
                               ),
                               CustomPaint(
-                                size: const Size(double.infinity, 240),
+                                size: const Size(130, 240),
                                 painter: _SingleFootprintPainter(
                                   shoeData.toePressure, 
                                   shoeData.midfootPressure, 
@@ -111,6 +127,27 @@ class _ShoeScreenState extends State<ShoeScreen> {
                                   _isLeftSelected
                                 ),
                               ),
+                              if (shoeData.isSterilizing)
+                                AnimatedBuilder(
+                                  animation: _scannerController,
+                                  builder: (context, child) {
+                                    return Positioned(
+                                      top: _scannerController.value * 236, // Scan from top to bottom
+                                      child: Container(
+                                        width: 140,
+                                        height: 4,
+                                        decoration: BoxDecoration(
+                                          color: Colors.cyanAccent,
+                                          borderRadius: BorderRadius.circular(2),
+                                          boxShadow: [
+                                            BoxShadow(color: Colors.cyanAccent.withValues(alpha: 0.8), blurRadius: 12, spreadRadius: 3),
+                                            BoxShadow(color: Colors.white, blurRadius: 4, spreadRadius: 1),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                             ],
                           ),
                         ),

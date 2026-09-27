@@ -14,6 +14,7 @@ class ShoeData {
   final double temperatureC; // DHT22
   final double humidityPct; // DHT22
   final bool footDetected;
+  final bool isSterilizing;
 
   ShoeData({
     required this.gasAnalog,
@@ -23,6 +24,7 @@ class ShoeData {
     required this.temperatureC,
     required this.humidityPct,
     required this.footDetected,
+    required this.isSterilizing,
   });
 }
 
@@ -159,6 +161,7 @@ class ESP32SensorService {
       temperatureC: 0.0,
       humidityPct: 0.0,
       footDetected: leftData['footDetected'] as bool? ?? false,
+      isSterilizing: leftData['isSterilizing'] as bool? ?? false,
     );
 
     final rightShoe = ShoeData(
@@ -169,6 +172,7 @@ class ESP32SensorService {
       temperatureC: 0.0,
       humidityPct: 0.0,
       footDetected: rightData['footDetected'] as bool? ?? false,
+      isSterilizing: rightData['isSterilizing'] as bool? ?? false,
     );
 
     _controller.add(SensorSnapshot(

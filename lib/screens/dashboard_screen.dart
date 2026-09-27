@@ -199,11 +199,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: PrimaryButton(
+                        text: 'Start Left Shoe',
+                        onPressed: () {
+                          _sendCommand(context, 'left_shoe', 'START_SHOE_UVC');
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Left shoe sterilization started')));
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: PrimaryButton(
+                        text: 'Start Right Shoe',
+                        onPressed: () {
+                          _sendCommand(context, 'right_shoe', 'START_SHOE_UVC');
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Right shoe sterilization started')));
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 PrimaryButton(
-                  text: 'Start Sterilization',
+                  text: 'Start Cabinet Cycle',
                   onPressed: () {
                     // Send command to Firebase
-                    _sendCommand(context, avgGas >= 2500 ? 'START_HEAVY' : 'START_UVC');
+                    _sendCommand(context, 'cabinet', avgGas >= 2500 ? 'START_HEAVY' : 'START_UVC');
                     widget.onNavigate(2); // Go to Cabinet screen
                   },
                 ),
@@ -217,7 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
   
-  void _sendCommand(BuildContext context, String cmd) async {
+  void _sendCommand(BuildContext context, String node, String cmd) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     
@@ -225,7 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final systemId = prefs.getString('system_id');
     
     if (systemId != null && systemId.isNotEmpty) {
-      await FirebaseDatabase.instance.ref('devices/$systemId/cabinet/command').set(cmd);
+      await FirebaseDatabase.instance.ref('devices/$systemId/$node/command').set(cmd);
     }
   }
 }

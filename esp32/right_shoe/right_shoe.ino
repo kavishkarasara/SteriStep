@@ -13,16 +13,22 @@
 #define FSR_TOE_PIN 2
 #define FSR_HEEL_PIN 3
 #define FSR_MID_PIN 4
+#define RELAY_SHOE_UVC 5
 
 FirebaseData firebaseData;
 FirebaseAuth auth;
 FirebaseConfig config;
 
 unsigned long lastUpdate = 0;
+bool isSterilizing = false;
+unsigned long sterilizationStartTime = 0;
 
 void setup() {
   Serial.begin(115200);
   
+  pinMode(RELAY_SHOE_UVC, OUTPUT);
+  digitalWrite(RELAY_SHOE_UVC, LOW);
+
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
@@ -38,6 +44,27 @@ void setup() {
 }
 
 void loop() {
+  String basePath = String("/devices/") + SYSTEM_ID + "/right_shoe";
+  
+  // Check for commands
+  if (Firebase.getString(firebaseData, basePath + "/command")) {
+    String cmd = firebaseData.stringData();
+    if (cmd == "START_SHOE_UVC" && !isSterilizing) {
+      isSterilizing = true;
+      digitalWrite(RELAY_SHOE_UVC, HIGH);
+      sterilizationStartTime = millis();
+      Firebase.setString(firebaseData, basePath + "/command", "IDLE");
+    }
+  }
+
+  // Sterilization Timer (1 min demo)
+  if (isSterilizing) {
+    if (millis() - sterilizationStartTime > 60000) {
+      isSterilizing = false;
+      digitalWrite(RELAY_SHOE_UVC, LOW);
+    }
+  }
+
   if (millis() - lastUpdate >= 5000) {
     lastUpdate = millis();
     updateFirebase();
@@ -66,6 +93,7 @@ void updateFirebase() {
   success &= Firebase.setFloat(firebaseData, basePath + "/heelPressure", heelP);
   success &= Firebase.setFloat(firebaseData, basePath + "/midfootPressure", midP);
   success &= Firebase.setBool(firebaseData, basePath + "/footDetected", footDetected);
+  success &= Firebase.setBool(firebaseData, basePath + "/isSterilizing", isSterilizing);
   success &= Firebase.setInt(firebaseData, basePath + "/uptime", millis() / 1000);
 
   if (success) {
