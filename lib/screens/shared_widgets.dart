@@ -74,37 +74,45 @@ class _ConnectingIndicatorState extends State<ConnectingIndicator> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (!_isOffline)
-              const CircularProgressIndicator(color: AppColors.blueDark)
-            else
-              const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.danger),
-            const SizedBox(height: 16),
-            Text(
-              _isOffline ? 'ESP32 Disconnected' : 'Connecting to ESP32...',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: _isOffline ? AppColors.danger : AppColors.text,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const ScreenHeader(greeting: 'System Status', title: 'Connection'),
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!_isOffline)
+                    const CircularProgressIndicator(color: AppColors.blueDark)
+                  else
+                    const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.danger),
+                  const SizedBox(height: 16),
+                  Text(
+                    _isOffline ? 'ESP32 Disconnected' : 'Connecting to ESP32...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: _isOffline ? AppColors.danger : AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Make sure your ESP32 is turned on and connected to Wi-Fi.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Make sure your ESP32 is turned on and connected to Wi-Fi.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.muted,
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
