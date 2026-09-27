@@ -10,6 +10,7 @@ import 'services/background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'theme.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -144,6 +145,9 @@ class _RootShellState extends State<RootShell> {
     flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
+        
+    // Request battery optimization ignore
+    _requestBatteryPermission();
 
     _sensorService.start(
       onDataRaw: (data) {
@@ -161,6 +165,12 @@ class _RootShellState extends State<RootShell> {
   void dispose() {
     _sensorService.dispose();
     super.dispose();
+  }
+
+  Future<void> _requestBatteryPermission() async {
+    if (await Permission.ignoreBatteryOptimizations.isDenied) {
+      await Permission.ignoreBatteryOptimizations.request();
+    }
   }
 
   void _goTo(int index) => setState(() => _tabIndex = index);

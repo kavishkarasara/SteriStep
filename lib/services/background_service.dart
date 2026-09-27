@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+import 'package:flutter/material.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -50,6 +51,7 @@ Future<void> initializeBackgroundService() async {
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase in background isolate
   try {
@@ -76,12 +78,14 @@ void onStart(ServiceInstance service) async {
 
   // Get system ID from shared preferences
   final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
   final systemId = prefs.getString('system_id');
 
   if (systemId == null || systemId.isEmpty) {
     // No system ID, keep service running but poll until available
-    Timer.periodic(const Duration(seconds: 30), (timer) async {
+    Timer.periodic(const Duration(seconds: 15), (timer) async {
       final p = await SharedPreferences.getInstance();
+      await p.reload();
       final sid = p.getString('system_id');
       if (sid != null && sid.isNotEmpty) {
         timer.cancel();
