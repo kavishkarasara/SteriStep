@@ -6,9 +6,13 @@ import 'screens/cabinet_screen.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/alert_service.dart';
+import 'services/background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'theme.dart';
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +21,13 @@ void main() async {
   } catch (e) {
     debugPrint('Firebase initialization error: $e');
   }
+  
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+  await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
+
+  await initializeBackgroundService();
+
   runApp(const SteriStepApp());
 }
 
@@ -128,6 +139,12 @@ class _RootShellState extends State<RootShell> {
   @override
   void initState() {
     super.initState();
+    
+    // Request permission once when logged in
+    flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+
     _sensorService.start(
       onDataRaw: (data) {
         if (mounted) {

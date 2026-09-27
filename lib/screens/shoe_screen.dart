@@ -12,23 +12,31 @@ class ShoeScreen extends StatefulWidget {
   State<ShoeScreen> createState() => _ShoeScreenState();
 }
 
-class _ShoeScreenState extends State<ShoeScreen> with SingleTickerProviderStateMixin {
+class _ShoeScreenState extends State<ShoeScreen> {
   bool _isLeftSelected = false; // Default to Right Foot
-  late AnimationController _scannerController;
+
+  bool _showLeftCompleted = false;
+  bool _showRightCompleted = false;
 
   @override
-  void initState() {
-    super.initState();
-    _scannerController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _scannerController.dispose();
-    super.dispose();
+  void didUpdateWidget(ShoeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.data != null && oldWidget.data != null) {
+      // Check Left
+      if (oldWidget.data!.leftShoe.isSterilizing && !widget.data!.leftShoe.isSterilizing) {
+        setState(() => _showLeftCompleted = true);
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted) setState(() => _showLeftCompleted = false);
+        });
+      }
+      // Check Right
+      if (oldWidget.data!.rightShoe.isSterilizing && !widget.data!.rightShoe.isSterilizing) {
+        setState(() => _showRightCompleted = true);
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted) setState(() => _showRightCompleted = false);
+        });
+      }
+    }
   }
 
   @override
@@ -127,31 +135,10 @@ class _ShoeScreenState extends State<ShoeScreen> with SingleTickerProviderStateM
                                   _isLeftSelected
                                 ),
                               ),
-                              if (shoeData.isSterilizing)
-                                AnimatedBuilder(
-                                  animation: _scannerController,
-                                  builder: (context, child) {
-                                    return Positioned(
-                                      top: _scannerController.value * 236, // Scan from top to bottom
-                                      child: Container(
-                                        width: 140,
-                                        height: 4,
-                                        decoration: BoxDecoration(
-                                          color: Colors.cyanAccent,
-                                          borderRadius: BorderRadius.circular(2),
-                                          boxShadow: [
-                                            BoxShadow(color: Colors.cyanAccent.withValues(alpha: 0.8), blurRadius: 12, spreadRadius: 3),
-                                            BoxShadow(color: Colors.white, blurRadius: 4, spreadRadius: 1),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
+                             ],
+                           ),
+                         ),
+                         const SizedBox(height: 12),
                         Builder(
                           builder: (context) {
                             String pressureMsg = 'Pressure normal';
@@ -171,7 +158,32 @@ class _ShoeScreenState extends State<ShoeScreen> with SingleTickerProviderStateM
                     ),
                   ),
                 ),
-                const SizedBox(height: 2),
+                if (shoeData.isSterilizing || (_isLeftSelected ? _showLeftCompleted : _showRightCompleted))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12.0),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            if (shoeData.isSterilizing) ...[
+                              const SizedBox(
+                                width: 24, height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.cyanAccent),
+                              ),
+                              const SizedBox(width: 16),
+                              const Expanded(child: Text('Sterilization in Progress...', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 16))),
+                            ] else ...[
+                              const Icon(Icons.check_circle, color: AppColors.safe, size: 28),
+                              const SizedBox(width: 16),
+                              const Expanded(child: Text('Sterilization Completed!', style: TextStyle(color: AppColors.safe, fontWeight: FontWeight.bold, fontSize: 16))),
+                            ]
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     MiniCard(label: 'Gas (MQ-137)', value: '${shoeData.gasAnalog} ppm'),

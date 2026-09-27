@@ -24,7 +24,14 @@ class CabinetScreen extends StatelessWidget {
         child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const ScreenHeader(greeting: 'Cabinet', title: 'Sterilization in Progress'),
+          ScreenHeader(
+            greeting: 'Cabinet', 
+            title: (data!.cabinetStatus == 'Cleaning process is done' || data!.cabinetStatus == 'Done') 
+                ? 'Sterilization Complete ✅' 
+                : data!.cabinetStatus == 'Idle' 
+                    ? 'Ready to Sterilize' 
+                    : 'Sterilization in Progress'
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Column(
@@ -56,7 +63,7 @@ class CabinetScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          data!.cabinetStatus == 'Done' ? 'Sterilization Complete' :
+                          (data!.cabinetStatus == 'Done' || data!.cabinetStatus == 'Cleaning process is done') ? 'Sterilization Complete' :
                           data!.cabinetStatus == 'Idle' ? 'Ready to Sterilize' : 'Est. ${60 - (data!.cabinetProgress / 100 * 60).toInt()} sec remaining', 
                           style: const TextStyle(fontSize: 12.0, color: AppColors.muted)
                         ),
@@ -75,23 +82,21 @@ class CabinetScreen extends StatelessWidget {
                         const SizedBox(height: 16),
                         Builder(builder: (context) {
                           int s1 = 0, s2 = 0, s3 = 0, s4 = 0;
-                          if (data!.cabinetStatus == 'Done') {
+                          if (data!.cabinetStatus == 'Cleaning process is done' || data!.cabinetStatus == 'Done') {
                             s1 = 2; s2 = 2; s3 = 2; s4 = 2;
                           } else if (data!.cabinetStatus != 'Idle') {
-                            s1 = 2;
-                            if (data!.cabinetProgress < 30) {
-                              if (data!.cabinetStatus.contains('H2O2')) {
-                                s2 = 1; s3 = 0; s4 = 0;
-                              } else {
-                                s2 = 0; s3 = 1; s4 = 0; // Skip H2O2
-                              }
-                            } else if (data!.cabinetProgress < 80) {
-                              if (data!.cabinetStatus.contains('H2O2')) s2 = 2;
-                              s3 = 1; s4 = 0;
+                            s1 = 2; // Gas check done
+                            
+                            bool isHeavy = data!.cabinetStatus == 'Sterilization in process';
+                            
+                            if (!isHeavy) {
+                              s2 = -1; // Skipped (Strikethrough)
                             } else {
-                              if (data!.cabinetStatus.contains('H2O2')) s2 = 2;
-                              s3 = 2; s4 = 1;
+                              s2 = data!.cabinetProgress < 100 ? 1 : 2; // H2O2 Active together with UVC
                             }
+                            
+                            s3 = data!.cabinetProgress < 100 ? 1 : 2; 
+                            s4 = data!.cabinetProgress > 80 ? 1 : 0; // Vent near end
                           }
 
                           final avgGas = ((data!.leftShoe.gasAnalog + data!.rightShoe.gasAnalog) / 2).round();
@@ -154,10 +159,11 @@ class CabinetScreen extends StatelessWidget {
     );
   }
 
-  // state: 0 = pending, 1 = active, 2 = done
+  // state: -1 = skipped, 0 = pending, 1 = active, 2 = done
   Widget _buildStage({required String text, required int state, String number = '✓'}) {
     final bool isDone = state == 2;
     final bool isActive = state == 1;
+    final bool isSkipped = state == -1;
     
     Color bgColor = const Color(0xFFe9eef8);
     Color textColor = AppColors.blueDark;
@@ -168,6 +174,9 @@ class CabinetScreen extends StatelessWidget {
     } else if (isActive) {
       bgColor = AppColors.blue;
       textColor = Colors.white;
+    } else if (isSkipped) {
+      bgColor = Colors.grey.withValues(alpha: 0.2);
+      textColor = Colors.grey;
     }
 
     return Padding(
@@ -180,14 +189,18 @@ class CabinetScreen extends StatelessWidget {
             decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
             alignment: Alignment.center,
             child: Text(
-              isDone ? '✓' : number,
+              isDone ? '✓' : (isSkipped ? '!' : number),
               style: TextStyle(color: textColor, fontSize: 10.4, fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(width: 10),
           Text(
             text,
-            style: const TextStyle(fontSize: 12.5, color: AppColors.text),
+            style: TextStyle(
+              fontSize: 12.5, 
+              color: isSkipped ? Colors.grey : AppColors.text,
+              decoration: isSkipped ? TextDecoration.lineThrough : null,
+            ),
           ),
         ],
       ),

@@ -43,28 +43,67 @@ void setup() {
   Firebase.reconnectWiFi(true);
 }
 
+#include <DHT.h>
+
+#define DHT_PIN 6
+#define DHT_TYPE DHT22
+
+DHT dht(DHT_PIN, DHT_TYPE);
+
+bool lastFootDetected = false;
+unsigned long sterilizationDuration = 300000; // Default 5 mins
+
 void loop() {
   String basePath = String("/devices/") + SYSTEM_ID + "/left_shoe";
   
-  // Check for commands
+  // Read Sensors for Auto-Logic
+  double toeP = analogRead(FSR_TOE_PIN) * (10.0 / 4095.0); 
+  double heelP = analogRead(FSR_HEEL_PIN) * (10.0 / 4095.0);
+  bool currentFootDetected = (toeP > 1.0 || heelP > 1.0);
+
+  // Flowchart Auto-Sterilization Logic
+  if (currentFootDetected && !lastFootDetected) {
+    lastFootDetected = true; // Foot put in
+  }
+  else if (!currentFootDetected && lastFootDetected) {
+    lastFootDetected = false; // Foot removed
+    
+    if (!isSterilizing) {
+      isSterilizing = true;
+      digitalWrite(RELAY_SHOE_UVC, HIGH); // H2O2 / UVC Relay
+      sterilizationStartTime = millis();
+      
+      // Determine duration based on Humidity
+      float h = dht.readHumidity();
+      if (!isnan(h) && h >= 65.0) {
+        sterilizationDuration = 180000; // 180s (3 mins)
+      } else {
+        sterilizationDuration = 300000; // 300s (5 mins)
+      }
+    }
+  }
+
+  // App Command overrides
   if (Firebase.getString(firebaseData, basePath + "/command")) {
     String cmd = firebaseData.stringData();
     if (cmd == "START_SHOE_UVC" && !isSterilizing) {
       isSterilizing = true;
       digitalWrite(RELAY_SHOE_UVC, HIGH);
       sterilizationStartTime = millis();
+      sterilizationDuration = 180000; // Manual run for 3 mins
       Firebase.setString(firebaseData, basePath + "/command", "IDLE");
     }
   }
 
-  // Sterilization Timer (1 min demo)
+  // Sterilization Timer
   if (isSterilizing) {
-    if (millis() - sterilizationStartTime > 60000) {
+    if (millis() - sterilizationStartTime > sterilizationDuration) {
       isSterilizing = false;
       digitalWrite(RELAY_SHOE_UVC, LOW);
     }
   }
 
+  // Push to Firebase every 5s
   if (millis() - lastUpdate >= 5000) {
     lastUpdate = millis();
     updateFirebase();
@@ -73,7 +112,7 @@ void loop() {
 
 void updateFirebase() {
   int gasAnalog = analogRead(MQ135_PIN);
-  if (gasAnalog < 100) gasAnalog = 0; // Noise gate for floating pins
+  if (gasAnalog < 100) gasAnalog = 0; 
 
   double toeP = analogRead(FSR_TOE_PIN) * (10.0 / 4095.0); 
   if (toeP < 0.2) toeP = 0;
@@ -85,6 +124,11 @@ void updateFirebase() {
   if (midP < 0.2) midP = 0;
   bool footDetected = (toeP > 1.0 || heelP > 1.0);
 
+  float t = dht.readTemperature();
+  float h = dht.readHumidity();
+  if (isnan(t)) t = 0.0;
+  if (isnan(h)) h = 0.0;
+
   String basePath = String("/devices/") + SYSTEM_ID + "/left_shoe";
   
   bool success = true;
@@ -94,6 +138,8 @@ void updateFirebase() {
   success &= Firebase.setFloat(firebaseData, basePath + "/midfootPressure", midP);
   success &= Firebase.setBool(firebaseData, basePath + "/footDetected", footDetected);
   success &= Firebase.setBool(firebaseData, basePath + "/isSterilizing", isSterilizing);
+  success &= Firebase.setFloat(firebaseData, basePath + "/temperatureC", t);
+  success &= Firebase.setFloat(firebaseData, basePath + "/humidityPct", h);
   success &= Firebase.setInt(firebaseData, basePath + "/uptime", millis() / 1000);
 
   if (success) {

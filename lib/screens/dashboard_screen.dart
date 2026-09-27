@@ -199,36 +199,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: PrimaryButton(
-                        text: 'Start Left Shoe',
-                        onPressed: () {
-                          _sendCommand(context, 'left_shoe', 'START_SHOE_UVC');
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Left shoe sterilization started')));
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: PrimaryButton(
-                        text: 'Start Right Shoe',
-                        onPressed: () {
-                          _sendCommand(context, 'right_shoe', 'START_SHOE_UVC');
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Right shoe sterilization started')));
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+
                 PrimaryButton(
                   text: 'Start Cabinet Cycle',
                   onPressed: () {
-                    // Send command to Firebase
-                    _sendCommand(context, 'cabinet', avgGas >= 2500 ? 'START_HEAVY' : 'START_UVC');
-                    widget.onNavigate(2); // Go to Cabinet screen
+                    if (widget.data != null && widget.data!.isCabinetConnected) {
+                      _sendCommand(context, 'cabinet', avgGas >= 2500 ? 'START_HEAVY' : 'START_UVC');
+                      widget.onNavigate(2); // Go to Cabinet screen
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cabinet is disconnected!')));
+                    }
                   },
                 ),
                 const SizedBox(height: 24),
@@ -250,6 +230,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     
     if (systemId != null && systemId.isNotEmpty) {
       await FirebaseDatabase.instance.ref('devices/$systemId/$node/command').set(cmd);
+      
+      if (node == 'cabinet') {
+        // Optimistic UI Update so the Cabinet screen shows it starting from 0 immediately
+        String status = cmd == 'START_HEAVY' ? 'Sterilization in process' : 'UVC Sterilization in process';
+        await FirebaseDatabase.instance.ref('devices/$systemId/cabinet/cabinetStatus').set(status);
+        await FirebaseDatabase.instance.ref('devices/$systemId/cabinet/progress').set(0);
+      }
     }
   }
 }

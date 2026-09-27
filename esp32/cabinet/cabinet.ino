@@ -68,40 +68,47 @@ void loop() {
     String cmd = firebaseData.stringData();
     if (cmd == "START_UVC" && !isSterilizing) {
       isSterilizing = true;
-      cabinetStatus = "UVC Sterilizing";
-      digitalWrite(RELAY_UVC, HIGH);
-      digitalWrite(RELAY_FAN, HIGH);
+      cabinetStatus = "UVC Sterilization in process";
       sterilizationStartTime = millis();
       sterilizationProgress = 0;
-      Firebase.setString(firebaseData, basePath + "/command", "IDLE"); // Clear command
+      Firebase.setString(firebaseData, basePath + "/command", "IDLE"); 
     } 
     else if (cmd == "START_HEAVY" && !isSterilizing) {
       isSterilizing = true;
-      cabinetStatus = "UVC+H2O2 Sterilizing";
-      digitalWrite(RELAY_UVC, HIGH);
-      digitalWrite(RELAY_MIST, HIGH);
-      digitalWrite(RELAY_FAN, HIGH);
+      cabinetStatus = "Sterilization in process";
       sterilizationStartTime = millis();
       sterilizationProgress = 0;
-      Firebase.setString(firebaseData, basePath + "/command", "IDLE"); // Clear command
+      Firebase.setString(firebaseData, basePath + "/command", "IDLE"); 
     }
   }
 
-  // Sterilization Timer Logic
+  // Flowchart exact Sterilization Logic
   if (isSterilizing) {
     unsigned long elapsed = millis() - sterilizationStartTime;
-    sterilizationProgress = (elapsed * 100) / 60000; // 60s total
+    sterilizationProgress = (elapsed * 100) / 60000; // 60s total delay
     if (sterilizationProgress > 100) sterilizationProgress = 100;
 
-    if (elapsed > 60000) { // 1 min sterilization for demo
+    if (cabinetStatus == "Sterilization in process") {
+      // Flowchart YES branch: H2O2 + UVC together
+      digitalWrite(RELAY_UVC, HIGH);
+      digitalWrite(RELAY_MIST, HIGH);
+      digitalWrite(RELAY_FAN, HIGH);
+    } else {
+      // Flowchart NO branch: UVC only
+      digitalWrite(RELAY_UVC, HIGH);
+      digitalWrite(RELAY_MIST, LOW);
+      digitalWrite(RELAY_FAN, HIGH); // Keeping fan to cool down UVC
+    }
+
+    if (elapsed > 60000) { // Delay done
       isSterilizing = false;
-      cabinetStatus = "Done";
+      cabinetStatus = "Cleaning process is done"; // Exact wording from flowchart
       sterilizationProgress = 100;
       digitalWrite(RELAY_UVC, LOW);
       digitalWrite(RELAY_MIST, LOW);
       digitalWrite(RELAY_FAN, LOW);
       digitalWrite(BUZZER_PIN, HIGH);
-      delay(1000); // Beep to indicate done
+      delay(1000); 
       digitalWrite(BUZZER_PIN, LOW);
     }
   }

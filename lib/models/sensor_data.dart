@@ -158,8 +158,8 @@ class ESP32SensorService {
       toePressure: (leftData['toePressure'] as num?)?.toDouble() ?? 0.0,
       heelPressure: (leftData['heelPressure'] as num?)?.toDouble() ?? 0.0,
       midfootPressure: (leftData['midfootPressure'] as num?)?.toDouble() ?? 0.0,
-      temperatureC: 0.0,
-      humidityPct: 0.0,
+      temperatureC: (leftData['temperatureC'] as num?)?.toDouble() ?? 0.0,
+      humidityPct: (leftData['humidityPct'] as num?)?.toDouble() ?? 0.0,
       footDetected: leftData['footDetected'] as bool? ?? false,
       isSterilizing: leftData['isSterilizing'] as bool? ?? false,
     );
@@ -169,8 +169,8 @@ class ESP32SensorService {
       toePressure: (rightData['toePressure'] as num?)?.toDouble() ?? 0.0,
       heelPressure: (rightData['heelPressure'] as num?)?.toDouble() ?? 0.0,
       midfootPressure: (rightData['midfootPressure'] as num?)?.toDouble() ?? 0.0,
-      temperatureC: 0.0,
-      humidityPct: 0.0,
+      temperatureC: (rightData['temperatureC'] as num?)?.toDouble() ?? 0.0,
+      humidityPct: (rightData['humidityPct'] as num?)?.toDouble() ?? 0.0,
       footDetected: rightData['footDetected'] as bool? ?? false,
       isSterilizing: rightData['isSterilizing'] as bool? ?? false,
     );

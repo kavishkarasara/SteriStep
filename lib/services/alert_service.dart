@@ -1,13 +1,19 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../main.dart';
 
 class AlertService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
   
   // Track last alert times to prevent spamming
   DateTime? _lastShoeAlert;
-  DateTime? _lastCabinetAlert;
+  DateTime? _lastCabinetStartAlert;
+  
+  bool _wasLeftSterilizing = false;
+  bool _wasRightSterilizing = false;
+  String _lastCabinetStatus = 'Idle';
 
   void evaluateData(Map<String, dynamic> data, BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -22,6 +28,9 @@ class AlertService {
     final rGas = (rightData['gasAnalog'] as num?)?.toInt() ?? 0;
     final lFoot = leftData['footDetected'] as bool? ?? false;
     final rFoot = rightData['footDetected'] as bool? ?? false;
+    final leftIsSterilizing = leftData['isSterilizing'] as bool? ?? false;
+    final rightIsSterilizing = rightData['isSterilizing'] as bool? ?? false;
+    
     final cabinetStatus = cabinetData['cabinetStatus']?.toString() ?? 'Idle';
     final doorOpen = (cabinetData['doorOpen'] as num?)?.toInt() == 1;
 
@@ -32,14 +41,15 @@ class AlertService {
     if (isFootDetected && maxGas >= 1200) {
       if (_lastShoeAlert == null || DateTime.now().difference(_lastShoeAlert!).inMinutes > 2) {
         _lastShoeAlert = DateTime.now();
-        _createAlert(uid, 'High odor detected! Please put the shoe in the sterilization cabinet.', 'Sterilization Required', context);
+        // Exact flowchart string
+        _createAlert(uid, 'put the shoe in the sterilization cabinet Sterilization in process', 'Sterilization Required', context);
       }
     }
 
     // RULE 2: Cabinet Flow - Shoe placed in cabinet (no foot) and needs sterilization
     if (!isFootDetected && maxGas >= 1200 && !doorOpen && cabinetStatus == 'Idle') {
-      if (_lastCabinetAlert == null || DateTime.now().difference(_lastCabinetAlert!).inMinutes > 2) {
-        _lastCabinetAlert = DateTime.now();
+      if (_lastCabinetStartAlert == null || DateTime.now().difference(_lastCabinetStartAlert!).inMinutes > 2) {
+        _lastCabinetStartAlert = DateTime.now();
         
         if (maxGas >= 2500) {
           _createAlert(uid, 'Shoe placed in cabinet. H2O2 + UVC Sterilization started.', 'Heavy Sterilization Started', context);
@@ -51,13 +61,30 @@ class AlertService {
       }
     }
 
-    // RULE 3: Sterilization Done
-    if (cabinetStatus == 'Done') {
-      if (_lastCabinetAlert == null || DateTime.now().difference(_lastCabinetAlert!).inMinutes > 2) {
-        _lastCabinetAlert = DateTime.now();
-        _createAlert(uid, 'Sterilization process has completed successfully.', 'Cleaning Process Done', context);
-      }
+    // RULE 3: Cabinet Sterilization Done
+    if (cabinetStatus == 'Cleaning process is done' && _lastCabinetStatus != 'Cleaning process is done') {
+      _createAlert(uid, 'Cleaning process is done', 'Cabinet Sterilization', context);
     }
+
+    // RULE 4: Shoe Sterilization Started (Send Message: "Sterilization in process")
+    if (!_wasLeftSterilizing && leftIsSterilizing) {
+      _createAlert(uid, 'Sterilization in process', 'Left Shoe Sterilization', context);
+    }
+    if (!_wasRightSterilizing && rightIsSterilizing) {
+      _createAlert(uid, 'Sterilization in process', 'Right Shoe Sterilization', context);
+    }
+
+    // RULE 5: Shoe Sterilization Done (Send Message: "Cleaning process is done")
+    if (_wasLeftSterilizing && !leftIsSterilizing) {
+      _createAlert(uid, 'Cleaning process is done', 'Left Shoe Sterilization', context);
+    }
+    if (_wasRightSterilizing && !rightIsSterilizing) {
+      _createAlert(uid, 'Cleaning process is done', 'Right Shoe Sterilization', context);
+    }
+
+    _wasLeftSterilizing = leftIsSterilizing;
+    _wasRightSterilizing = rightIsSterilizing;
+    _lastCabinetStatus = cabinetStatus;
   }
 
   Future<void> _sendCommand(String uid, String cmd) async {
@@ -77,8 +104,32 @@ class AlertService {
       'message': message,
       'timestamp': ServerValue.timestamp,
     });
+    
+    _showPushNotification(title, message);
+    
     if (!context.mounted) return;
     _showInAppNotification(context, title, message);
+  }
+
+  Future<void> _showPushNotification(String title, String message) async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'steristep_alerts',
+      'SteriStep Alerts',
+      channelDescription: 'Notifications for shoe and cabinet status',
+      importance: Importance.max,
+      priority: Priority.high,
+      ticker: 'ticker',
+    );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+    
+    await flutterLocalNotificationsPlugin.show(
+      id: DateTime.now().millisecond, // Unique ID
+      title: title,
+      body: message,
+      notificationDetails: platformChannelSpecifics,
+    );
   }
 
   void _showInAppNotification(BuildContext context, String title, String message) {

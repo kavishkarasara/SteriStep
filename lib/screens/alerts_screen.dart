@@ -82,13 +82,15 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   Color color = AppColors.warning;
                   
                   final title = alert['title'] as String;
-                  if (title.contains('Sterilization Required') || title.contains('Heavy Sterilization')) {
+                  final message = alert['message'] as String;
+                  
+                  if (title.contains('Sterilization Required')) {
                     iconStr = '⚠';
                     color = AppColors.danger;
-                  } else if (title.contains('Done') || title.contains('Complete')) {
+                  } else if (message.contains('Cleaning process is done')) {
                     iconStr = '✓';
                     color = AppColors.safe;
-                  } else if (title.contains('Normal Sterilization')) {
+                  } else if (message.contains('Sterilization in process') || title.contains('Heavy Sterilization') || title.contains('Normal Sterilization')) {
                     iconStr = '◐';
                     color = AppColors.blue;
                   }
