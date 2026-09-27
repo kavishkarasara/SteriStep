@@ -1,0 +1,38 @@
+name: steristep_app
+description: SteriStep - Smart Shoe Sanitization System companion app
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  fl_chart: ^0.68.0        # for pressure/temperature charts
+  google_fonts: ^8.2.1
+  path_provider_android: 2.2.12
+  http: ^1.6.0
+  shared_preferences: ^2.5.5
+  firebase_core: any
+  firebase_database: any
+  firebase_auth: any
+  flutter_local_notifications: ^22.3.1
+
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "lib/assets/Logo.jpeg"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - lib/assets/

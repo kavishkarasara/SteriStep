@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "334958641884",
+    "firebase_url": "https://sterstep-cfeed-default-rtdb.firebaseio.com",
+    "project_id": "sterstep-cfeed",
+    "storage_bucket": "sterstep-cfeed.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:334958641884:android:f665257de0604de2c4ea19",
+        "android_client_info": {
+          "package_name": "com.example.steristep_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxA9NmDYKuIzAh47F1yaq4vEXWWsn7y_8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
