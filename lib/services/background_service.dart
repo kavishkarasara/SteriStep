@@ -109,6 +109,8 @@ void _startFirebaseListener(ServiceInstance service, String systemId) {
   });
 }
 
+bool _isFirstEvaluation = true;
+
 void _evaluateAndNotify(Map<String, dynamic> data, ServiceInstance service) {
   final leftData = data['left_shoe'] != null ? Map<String, dynamic>.from(data['left_shoe'] as Map) : {};
   final rightData = data['right_shoe'] != null ? Map<String, dynamic>.from(data['right_shoe'] as Map) : {};
@@ -125,35 +127,39 @@ void _evaluateAndNotify(Map<String, dynamic> data, ServiceInstance service) {
   final maxGas = lGas > rGas ? lGas : rGas;
   final isFootDetected = lFoot || rFoot;
 
-  // RULE 1: High gas while wearing shoe
-  if (isFootDetected && maxGas >= 1200) {
-    if (_lastShoeAlertTime == null || DateTime.now().difference(_lastShoeAlertTime!).inMinutes > 2) {
-      _lastShoeAlertTime = DateTime.now();
-      _sendNotification('Sterilization Required', 'put the shoe in the sterilization cabinet Sterilization in process');
+  if (!_isFirstEvaluation) {
+    // RULE 1: High gas while wearing shoe
+    if (isFootDetected && maxGas >= 1200) {
+      if (_lastShoeAlertTime == null || DateTime.now().difference(_lastShoeAlertTime!).inMinutes > 2) {
+        _lastShoeAlertTime = DateTime.now();
+        _sendNotification('Sterilization Required', 'put the shoe in the sterilization cabinet Sterilization in process');
+      }
+    }
+
+    // RULE 2: Cabinet sterilization done
+    if (cabinetStatus == 'Cleaning process is done' && _lastCabinetStatus != 'Cleaning process is done') {
+      _sendNotification('Cabinet Sterilization', 'Cleaning process is done');
+    }
+
+    // RULE 3: Shoe sterilization started
+    if (!_wasLeftSterilizing && leftIsSterilizing) {
+      _sendNotification('Left Shoe Sterilization', 'Sterilization in process');
+    }
+    if (!_wasRightSterilizing && rightIsSterilizing) {
+      _sendNotification('Right Shoe Sterilization', 'Sterilization in process');
+    }
+
+    // RULE 4: Shoe sterilization done
+    if (_wasLeftSterilizing && !leftIsSterilizing) {
+      _sendNotification('Left Shoe Sterilization', 'Cleaning process is done');
+    }
+    if (_wasRightSterilizing && !rightIsSterilizing) {
+      _sendNotification('Right Shoe Sterilization', 'Cleaning process is done');
     }
   }
 
-  // RULE 2: Cabinet sterilization done
-  if (cabinetStatus == 'Cleaning process is done' && _lastCabinetStatus != 'Cleaning process is done') {
-    _sendNotification('Cabinet Sterilization', 'Cleaning process is done');
-  }
-
-  // RULE 3: Shoe sterilization started
-  if (!_wasLeftSterilizing && leftIsSterilizing) {
-    _sendNotification('Left Shoe Sterilization', 'Sterilization in process');
-  }
-  if (!_wasRightSterilizing && rightIsSterilizing) {
-    _sendNotification('Right Shoe Sterilization', 'Sterilization in process');
-  }
-
-  // RULE 4: Shoe sterilization done
-  if (_wasLeftSterilizing && !leftIsSterilizing) {
-    _sendNotification('Left Shoe Sterilization', 'Cleaning process is done');
-  }
-  if (_wasRightSterilizing && !rightIsSterilizing) {
-    _sendNotification('Right Shoe Sterilization', 'Cleaning process is done');
-  }
-
+  _isFirstEvaluation = false;
+  
   // Update state
   _lastCabinetStatus = cabinetStatus;
   _wasLeftSterilizing = leftIsSterilizing;
@@ -164,8 +170,8 @@ void _evaluateAndNotify(Map<String, dynamic> data, ServiceInstance service) {
     String statusText = 'Monitoring...';
     if (leftIsSterilizing || rightIsSterilizing) {
       statusText = 'Shoe sterilization in progress';
-    } else if (cabinetStatus != 'Idle') {
-      statusText = 'Cabinet: $cabinetStatus';
+    } else if (cabinetStatus == 'Sterilization in process' || cabinetStatus == 'UVC Sterilization in process') {
+      statusText = 'Cabinet: Sterilization in progress';
     }
     service.setForegroundNotificationInfo(
       title: 'SteriStep',

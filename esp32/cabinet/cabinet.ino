@@ -85,7 +85,9 @@ void loop() {
   // Flowchart exact Sterilization Logic
   if (isSterilizing) {
     unsigned long elapsed = millis() - sterilizationStartTime;
-    sterilizationProgress = (elapsed * 100) / 60000; // 60s total delay
+    unsigned long totalDelay = (cabinetStatus == "Sterilization in process") ? 1200000 : 900000; // 20 mins for H2O2+UVC, 15 mins for UVC only
+    
+    sterilizationProgress = (elapsed * 100) / totalDelay; 
     if (sterilizationProgress > 100) sterilizationProgress = 100;
 
     if (cabinetStatus == "Sterilization in process") {
@@ -100,7 +102,7 @@ void loop() {
       digitalWrite(RELAY_FAN, HIGH); // Keeping fan to cool down UVC
     }
 
-    if (elapsed > 60000) { // Delay done
+    if (elapsed > totalDelay) { // Delay done
       isSterilizing = false;
       cabinetStatus = "Cleaning process is done"; // Exact wording from flowchart
       sterilizationProgress = 100;

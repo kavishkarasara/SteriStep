@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../models/sensor_data.dart';
 import '../theme.dart';
 import 'shared_widgets.dart';
@@ -12,11 +15,27 @@ class ShoeScreen extends StatefulWidget {
   State<ShoeScreen> createState() => _ShoeScreenState();
 }
 
-class _ShoeScreenState extends State<ShoeScreen> {
+class _ShoeScreenState extends State<ShoeScreen> with SingleTickerProviderStateMixin {
   bool _isLeftSelected = false; // Default to Right Foot
 
   bool _showLeftCompleted = false;
   bool _showRightCompleted = false;
+  late AnimationController _laserController;
+
+  @override
+  void initState() {
+    super.initState();
+    _laserController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _laserController.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(ShoeScreen oldWidget) {
@@ -135,6 +154,25 @@ class _ShoeScreenState extends State<ShoeScreen> {
                                   _isLeftSelected
                                 ),
                               ),
+                              if (shoeData.isSterilizing)
+                                AnimatedBuilder(
+                                  animation: _laserController,
+                                  builder: (context, child) {
+                                    return Positioned(
+                                      top: _laserController.value * 220,
+                                      child: Container(
+                                        width: 140,
+                                        height: 4,
+                                        decoration: BoxDecoration(
+                                          color: Colors.cyanAccent,
+                                          boxShadow: [
+                                            BoxShadow(color: Colors.cyanAccent.withValues(alpha: 0.8), blurRadius: 10, spreadRadius: 2),
+                                          ]
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                              ],
                            ),
                          ),
@@ -203,6 +241,18 @@ class _ShoeScreenState extends State<ShoeScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
+                PrimaryButton(
+                  text: 'Start ${_isLeftSelected ? 'Left' : 'Right'} Shoe Sterilization',
+                  onPressed: () {
+                    final isConn = _isLeftSelected ? snapshot.isLeftConnected : snapshot.isRightConnected;
+                    if (widget.data != null && isConn) {
+                      _sendCommand(context, _isLeftSelected ? 'left_shoe' : 'right_shoe', 'START_SHOE_UVC');
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${_isLeftSelected ? 'Left' : 'Right'} shoe is disconnected!')));
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -210,6 +260,20 @@ class _ShoeScreenState extends State<ShoeScreen> {
       ),
       ),
     );
+  }
+
+  void _sendCommand(BuildContext context, String node, String cmd) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final systemId = prefs.getString('system_id');
+    
+    if (systemId != null && systemId.isNotEmpty) {
+      await FirebaseDatabase.instance.ref('devices/$systemId/$node/command').set(cmd);
+      // Optimistic UI
+      await FirebaseDatabase.instance.ref('devices/$systemId/$node/isSterilizing').set(true);
+    }
   }
 }
 

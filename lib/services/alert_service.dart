@@ -1,9 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import '../main.dart';
-
 class AlertService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
   
@@ -105,32 +102,10 @@ class AlertService {
       'timestamp': ServerValue.timestamp,
     });
     
-    _showPushNotification(title, message);
-    
     if (!context.mounted) return;
     _showInAppNotification(context, title, message);
   }
 
-  Future<void> _showPushNotification(String title, String message) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'steristep_alerts',
-      'SteriStep Alerts',
-      channelDescription: 'Notifications for shoe and cabinet status',
-      importance: Importance.max,
-      priority: Priority.high,
-      ticker: 'ticker',
-    );
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-    
-    await flutterLocalNotificationsPlugin.show(
-      id: DateTime.now().millisecond, // Unique ID
-      title: title,
-      body: message,
-      notificationDetails: platformChannelSpecifics,
-    );
-  }
 
   void _showInAppNotification(BuildContext context, String title, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
