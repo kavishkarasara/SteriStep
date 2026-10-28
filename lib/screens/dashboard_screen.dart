@@ -51,9 +51,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const ConnectingIndicator();
     }
 
-    final avgGas = ((widget.data!.leftShoe.gasAnalog + widget.data!.rightShoe.gasAnalog) / 2).round();
-    final avgTemp = widget.data!.cabinetTemperatureC;
-    final avgHum = widget.data!.cabinetHumidityPct;
+    final leftGas = widget.data!.leftShoe.gasAnalog;
+    final rightGas = widget.data!.rightShoe.gasAnalog;
+    final validGas = [
+      if (leftGas > 0) leftGas,
+      if (rightGas > 0) rightGas,
+    ];
+    final avgGas = validGas.isNotEmpty
+        ? (validGas.reduce((a, b) => a + b) / validGas.length).round()
+        : 0;
+
+    final leftTemp = widget.data!.leftShoe.temperatureC;
+    final rightTemp = widget.data!.rightShoe.temperatureC;
+    final validTemps = [
+      if (leftTemp > 0) leftTemp,
+      if (rightTemp > 0) rightTemp,
+    ];
+    final avgTemp = validTemps.isNotEmpty ? validTemps.reduce((a, b) => a + b) / validTemps.length : 0.0;
+
+    final leftHum = widget.data!.leftShoe.humidityPct;
+    final rightHum = widget.data!.rightShoe.humidityPct;
+    final validHums = [
+      if (leftHum > 0) leftHum,
+      if (rightHum > 0) rightHum,
+    ];
+    final avgHum = validHums.isNotEmpty ? validHums.reduce((a, b) => a + b) / validHums.length : 0.0;
 
     final gas = GasStatus.fromReading(avgGas);
 
@@ -95,8 +117,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       text: TextSpan(
                                         style: const TextStyle(color: AppColors.blueDark, fontWeight: FontWeight.w700),
                                         children: [
-                                          TextSpan(text: '$avgGas ', style: const TextStyle(fontSize: 30.4)),
+                                          TextSpan(text: '${gas.ppm} ', style: const TextStyle(fontSize: 30.4)),
                                           const TextSpan(text: 'ppm', style: TextStyle(fontSize: 12, color: AppColors.muted)),
+                                          TextSpan(text: '  (ADC: $avgGas)', style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w400)),
                                         ],
                                       ),
                                     ),
@@ -119,7 +142,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           decoration: BoxDecoration(color: const Color(0xFFe9eef8), borderRadius: BorderRadius.circular(6)),
                           alignment: Alignment.centerLeft,
                           child: FractionallySizedBox(
-                            widthFactor: (avgGas / 3000).clamp(0.0, 1.0),
+                            widthFactor: (avgGas / 4095.0).clamp(0.0, 1.0),
                             child: Container(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(6),
@@ -128,6 +151,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              gas.level == 1 ? Icons.check_circle_outline : (gas.level == 2 ? Icons.lightbulb_outline : Icons.waves),
+                              size: 14,
+                              color: gas.color,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Recommended: ${gas.action}',
+                                style: TextStyle(fontSize: 11.5, color: gas.color, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -135,9 +175,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    MiniCard(label: 'Avg Temp', value: '${avgTemp.toStringAsFixed(1)}°C'),
+                    MiniCard(label: 'Avg Shoe Temp', value: '${avgTemp.toStringAsFixed(1)}°C'),
                     const SizedBox(width: 12),
-                    MiniCard(label: 'Avg Humidity', value: '${avgHum.toStringAsFixed(0)}%'),
+                    MiniCard(label: 'Avg Shoe Humidity', value: '${avgHum.toStringAsFixed(0)}%'),
                   ],
                 ),
                 const SectionLabel('Quick Status'),
@@ -204,8 +244,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   text: 'Start Cabinet Cycle',
                   onPressed: () {
                     if (widget.data != null && widget.data!.isCabinetConnected) {
-                      _sendCommand(context, 'cabinet', avgGas >= 2500 ? 'START_HEAVY' : 'START_UVC');
-                      widget.onNavigate(2); // Go to Cabinet screen
+                      _showStartCycleSheet(context, avgGas);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cabinet is disconnected!')));
                     }
@@ -238,5 +277,100 @@ class _DashboardScreenState extends State<DashboardScreen> {
         await FirebaseDatabase.instance.ref('devices/$systemId/cabinet/progress').set(0);
       }
     }
+  }
+
+  void _showStartCycleSheet(BuildContext context, int avgGas) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final gasLevel = GasMetrics.getLevel(avgGas);
+        final ppm = GasMetrics.toPpm(avgGas);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Select Sterilization Cycle',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.blueDark),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Shoe Gas Level: $ppm ppm (Level $gasLevel)',
+                  style: const TextStyle(fontSize: 13, color: AppColors.muted),
+                ),
+                const SizedBox(height: 16),
+                
+                // Option 1: Dual Sterilization (UVC + H2O2 Vapor)
+                ListTile(
+                  tileColor: (gasLevel == 3 ? Colors.purple : AppColors.blue).withValues(alpha: 0.08),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  leading: const CircleAvatar(
+                    backgroundColor: Colors.purple,
+                    child: Icon(Icons.waves, color: Colors.white, size: 20),
+                  ),
+                  title: const Text('Dual Sterilization (H₂O₂ + UVC)', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('20 min: H₂O₂ vapor & UVC light together'),
+                  trailing: gasLevel == 3 
+                      ? Pill(text: 'Recommended', color: Colors.purple, bgColor: Colors.purple.withValues(alpha: 0.15)) 
+                      : null,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _sendCommand(context, 'cabinet', 'START_HEAVY');
+                    widget.onNavigate(2);
+                  },
+                ),
+                const SizedBox(height: 10),
+
+                // Option 2: UVC Only
+                ListTile(
+                  tileColor: (gasLevel == 2 ? AppColors.warning : AppColors.blue).withValues(alpha: 0.08),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  leading: const CircleAvatar(
+                    backgroundColor: AppColors.blue,
+                    child: Icon(Icons.lightbulb_outline, color: Colors.white, size: 20),
+                  ),
+                  title: const Text('UVC Light Only Cycle', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('15 min: Surface sterilization without H₂O₂'),
+                  trailing: gasLevel == 2 
+                      ? Pill(text: 'Recommended', color: AppColors.warning, bgColor: AppColors.warning.withValues(alpha: 0.15)) 
+                      : null,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _sendCommand(context, 'cabinet', 'START_UVC');
+                    widget.onNavigate(2);
+                  },
+                ),
+                const SizedBox(height: 14),
+
+                // Option 3: Auto Start
+                PrimaryButton(
+                  text: 'Auto Start (${gasLevel == 3 ? "Dual: H₂O₂ + UVC" : "UVC Only"})',
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _sendCommand(context, 'cabinet', avgGas >= 2500 ? 'START_HEAVY' : 'START_UVC');
+                    widget.onNavigate(2);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

@@ -224,7 +224,10 @@ class _ShoeScreenState extends State<ShoeScreen> with SingleTickerProviderStateM
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    MiniCard(label: 'Gas (MQ-137)', value: '${shoeData.gasAnalog} ppm'),
+                    MiniCard(
+                      label: 'Gas (${GasMetrics.getLevel(shoeData.gasAnalog) == 1 ? "Level 1" : GasMetrics.getLevel(shoeData.gasAnalog) == 2 ? "Level 2" : "Level 3"})', 
+                      value: '${GasMetrics.toPpm(shoeData.gasAnalog)} ppm',
+                    ),
                     const SizedBox(width: 12),
                     MiniCard(label: 'Skin Temp', value: '${shoeData.temperatureC.toStringAsFixed(1)}°C'),
                   ],

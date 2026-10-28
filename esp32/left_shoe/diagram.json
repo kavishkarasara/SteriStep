@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "author": "SteriStep",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -120, "left": -120, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "potGas", "top": 180, "left": -120, "attrs": { "label": "MQ135 Gas" } },
+    { "type": "wokwi-potentiometer", "id": "potToe", "top": 180, "left": 10, "attrs": { "label": "Toe FSR" } },
+    { "type": "wokwi-potentiometer", "id": "potMid", "top": 180, "left": 140, "attrs": { "label": "Mid FSR" } },
+    { "type": "wokwi-potentiometer", "id": "potHeel", "top": 180, "left": 270, "attrs": { "label": "Heel FSR" } },
+    { "type": "wokwi-led", "id": "ledUvc", "top": -80, "left": 150, "attrs": { "color": "purple", "label": "Shoe UVC" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serial:rx", "", [] ],
+    [ "esp:RX", "$serial:tx", "", [] ],
+    [ "esp:3V3", "dht1:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "dht1:GND", "black", [ "v0" ] ],
+    [ "esp:4", "dht1:SDA", "green", [ "v0" ] ],
+    [ "esp:3V3", "potGas:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "potGas:GND", "black", [ "v0" ] ],
+    [ "esp:34", "potGas:SIG", "orange", [ "v0" ] ],
+    [ "esp:3V3", "potToe:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "potToe:GND", "black", [ "v0" ] ],
+    [ "esp:35", "potToe:SIG", "orange", [ "v0" ] ],
+    [ "esp:3V3", "potMid:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "potMid:GND", "black", [ "v0" ] ],
+    [ "esp:33", "potMid:SIG", "orange", [ "v0" ] ],
+    [ "esp:3V3", "potHeel:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "potHeel:GND", "black", [ "v0" ] ],
+    [ "esp:32", "potHeel:SIG", "orange", [ "v0" ] ],
+    [ "esp:18", "ledUvc:A", "purple", [ "v0" ] ],
+    [ "esp:GND.2", "ledUvc:C", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "author": "SteriStep",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -120, "left": -120, "attrs": {} },
+    { "type": "wokwi-led", "id": "ledUvc", "top": -90, "left": 140, "attrs": { "color": "purple", "label": "UVC Relay (D18)" } },
+    { "type": "wokwi-led", "id": "ledMist", "top": -30, "left": 140, "attrs": { "color": "blue", "label": "H2O2 Mist (D19)" } },
+    { "type": "wokwi-led", "id": "ledFan", "top": 30, "left": 140, "attrs": { "color": "green", "label": "Fan Relay (D21)" } },
+    { "type": "wokwi-slide-switch", "id": "doorSwitch", "top": 140, "left": -80, "attrs": { "label": "Door Switch (D22)" } },
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": 140, "left": 100, "attrs": { "label": "Buzzer (D23)" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serial:rx", "", [] ],
+    [ "esp:RX", "$serial:tx", "", [] ],
+    [ "esp:3V3", "dht1:VCC", "red", [ "v0" ] ],
+    [ "esp:GND.1", "dht1:GND", "black", [ "v0" ] ],
+    [ "esp:4", "dht1:SDA", "green", [ "v0" ] ],
+    [ "esp:18", "ledUvc:A", "purple", [ "v0" ] ],
+    [ "esp:GND.2", "ledUvc:C", "black", [ "v0" ] ],
+    [ "esp:19", "ledMist:A", "blue", [ "v0" ] ],
+    [ "esp:GND.2", "ledMist:C", "black", [ "v0" ] ],
+    [ "esp:21", "ledFan:A", "green", [ "v0" ] ],
+    [ "esp:GND.2", "ledFan:C", "black", [ "v0" ] ],
+    [ "esp:22", "doorSwitch:1", "yellow", [ "v0" ] ],
+    [ "esp:GND.1", "doorSwitch:2", "black", [ "v0" ] ],
+    [ "esp:23", "buzzer:2", "red", [ "v0" ] ],
+    [ "esp:GND.2", "buzzer:1", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

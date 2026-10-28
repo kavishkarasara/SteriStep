@@ -43,19 +43,46 @@ ThemeData buildAppTheme() {
   );
 }
 
+class GasMetrics {
+  /// Converts raw MQ135 analog ADC reading (0-4095) to approximate PPM as defined in Table 3 of the project report
+  static int toPpm(int analog) {
+    if (analog <= 0) return 0;
+    if (analog <= 1200) {
+      // Level 1: 0 - 1200 ADC -> 0 - 1300 PPM
+      return ((analog / 1200.0) * 1300.0).round();
+    } else if (analog <= 2500) {
+      // Level 2: 1201 - 2500 ADC -> 1300 - 2300 PPM
+      return (1300.0 + ((analog - 1200.0) / 1300.0) * 1000.0).round();
+    } else {
+      // Level 3: 2501 - 4095 ADC -> 2300 - 3800 PPM
+      return (2300.0 + ((analog - 2500.0) / 1595.0) * 1500.0).clamp(2300.0, 4000.0).round();
+    }
+  }
+
+  /// Returns Level 1, 2, or 3 based on Table 3
+  static int getLevel(int analog) {
+    if (analog <= 1200) return 1;
+    if (analog <= 2500) return 2;
+    return 3;
+  }
+}
+
 class GasStatus {
   final String label;
   final Color color;
   final String action;
-  const GasStatus(this.label, this.color, this.action);
+  final int level;
+  final int ppm;
+  const GasStatus(this.label, this.color, this.action, this.level, this.ppm);
 
   factory GasStatus.fromReading(int analog) {
+    final ppm = GasMetrics.toPpm(analog);
     if (analog <= 1200) {
-      return const GasStatus('Minimal Bacteria', AppColors.safe, 'Surgical vapor only (30s)');
+      return GasStatus('Minimal Bacteria (Level 1)', AppColors.safe, 'Surgical vapor only (30s)', 1, ppm);
     } else if (analog <= 2500) {
-      return const GasStatus('Moderate Growth', AppColors.warning, 'UVC Light only (15 min)');
+      return GasStatus('Moderate Growth (Level 2)', AppColors.warning, 'UVC Light only (15 min)', 2, ppm);
     }
-    return const GasStatus('Heavy Growth', AppColors.danger, 'UVC + Surgical Vapor');
+    return GasStatus('Heavy Growth (Level 3)', AppColors.danger, 'UVC + H₂O₂ Surgical Vapor', 3, ppm);
   }
 }
 

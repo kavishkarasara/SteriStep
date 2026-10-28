@@ -95,6 +95,9 @@ class ESP32SensorService {
       } else {
         _controller.add(null);
       }
+    }, onError: (error) {
+      // Handles permission-denied or network drop gracefully without crashing
+      _controller.add(null);
     });
 
     // Run a periodic ticker to update the connection status (in case a module drops offline)

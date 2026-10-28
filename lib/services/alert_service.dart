@@ -1,16 +1,23 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'notification_service.dart';
+
 class AlertService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
-  
-  // Track last alert times to prevent spamming
-  DateTime? _lastShoeAlert;
-  DateTime? _lastCabinetStartAlert;
-  
+  final NotificationService _notificationService = NotificationService();
+
+  // State Tracking
+  bool _wasWearingContaminated = false;
+  DateTime? _lastShoeWearAlertTime;
+
   bool _wasLeftSterilizing = false;
   bool _wasRightSterilizing = false;
+
   String _lastCabinetStatus = 'Idle';
+  bool _wasDoorOpenDuringSterilization = false;
+  DateTime? _lastDoorAlertTime;
+  DateTime? _lastAutoCabinetStart;
 
   void evaluateData(Map<String, dynamic> data, BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -27,101 +34,222 @@ class AlertService {
     final rFoot = rightData['footDetected'] as bool? ?? false;
     final leftIsSterilizing = leftData['isSterilizing'] as bool? ?? false;
     final rightIsSterilizing = rightData['isSterilizing'] as bool? ?? false;
-    
+
     final cabinetStatus = cabinetData['cabinetStatus']?.toString() ?? 'Idle';
     final doorOpen = (cabinetData['doorOpen'] as num?)?.toInt() == 1;
 
     final maxGas = lGas > rGas ? lGas : rGas;
     final isFootDetected = lFoot || rFoot;
+    final isContaminated = maxGas >= 1200;
 
-    // RULE 1: Smart Shoe Flow - High gas while wearing
-    if (isFootDetected && maxGas >= 1200) {
-      if (_lastShoeAlert == null || DateTime.now().difference(_lastShoeAlert!).inMinutes > 2) {
-        _lastShoeAlert = DateTime.now();
-        // Exact flowchart string
-        _createAlert(uid, 'put the shoe in the sterilization cabinet Sterilization in process', 'Sterilization Required', context);
+    // =========================================================================
+    // RULE 1: Smart Shoe Flowchart (Fig 7) - High Gas While Wearing
+    // =========================================================================
+    if (isFootDetected && isContaminated) {
+      final now = DateTime.now();
+      final bool stateChanged = !_wasWearingContaminated;
+      final bool reminderDue = _lastShoeWearAlertTime != null && 
+                               now.difference(_lastShoeWearAlertTime!).inMinutes >= 3;
+
+      if (stateChanged || reminderDue) {
+        _lastShoeWearAlertTime = now;
+        _wasWearingContaminated = true;
+
+        _triggerAlert(
+          id: NotificationService.idShoeGasAlert,
+          title: 'Sterilization Required ⚠️',
+          message: 'put the shoe in the sterilization cabinet Sterilization in process',
+          context: context,
+        );
       }
+    } else {
+      // Reset state so that next time shoe is worn or contaminated, alert fires immediately
+      _wasWearingContaminated = false;
     }
 
-    // RULE 2: Cabinet Flow - Shoe placed in cabinet (no foot) and needs sterilization
-    if (!isFootDetected && maxGas >= 1200 && !doorOpen && cabinetStatus == 'Idle') {
-      if (_lastCabinetStartAlert == null || DateTime.now().difference(_lastCabinetStartAlert!).inMinutes > 2) {
-        _lastCabinetStartAlert = DateTime.now();
-        
+    // =========================================================================
+    // RULE 2: Cabinet Flowchart (Fig 8) - Shoe Placed in Cabinet (No Foot)
+    // =========================================================================
+    if (!isFootDetected && isContaminated && !doorOpen && cabinetStatus == 'Idle') {
+      final now = DateTime.now();
+      if (_lastAutoCabinetStart == null || now.difference(_lastAutoCabinetStart!).inMinutes >= 2) {
+        _lastAutoCabinetStart = now;
         if (maxGas >= 2500) {
-          _createAlert(uid, 'Shoe placed in cabinet. H2O2 + UVC Sterilization started.', 'Heavy Sterilization Started', context);
           _sendCommand(uid, 'START_HEAVY');
         } else {
-          _createAlert(uid, 'Shoe placed in cabinet. UVC Sterilization started.', 'Normal Sterilization Started', context);
           _sendCommand(uid, 'START_UVC');
         }
       }
     }
 
-    // RULE 3: Cabinet Sterilization Done
-    if (cabinetStatus == 'Cleaning process is done' && _lastCabinetStatus != 'Cleaning process is done') {
-      _createAlert(uid, 'Cleaning process is done', 'Cabinet Sterilization', context);
+    // =========================================================================
+    // RULE 3: Cabinet Sterilization Started (Fig 8)
+    // =========================================================================
+    final bool isCabinetRunning = cabinetStatus == 'Sterilization in process' || 
+                                  cabinetStatus == 'UVC Sterilization in process';
+    final bool wasCabinetNotRunning = _lastCabinetStatus == 'Idle' || 
+                                     _lastCabinetStatus == 'Cleaning process is done';
+
+    if (isCabinetRunning && wasCabinetNotRunning) {
+      final isHeavy = cabinetStatus == 'Sterilization in process';
+      _triggerAlert(
+        id: NotificationService.idCabinetCycle,
+        title: 'Cabinet Sterilization in Process 🧴',
+        message: isHeavy 
+            ? 'Sterilization in process (Dual H₂O₂ + UVC)'
+            : 'UVC Sterilization in process',
+        context: context,
+      );
     }
 
-    // RULE 4: Shoe Sterilization Started (Send Message: "Sterilization in process")
+    // =========================================================================
+    // RULE 4: Cabinet Door Opened During Sterilization (Safety Interlock)
+    // =========================================================================
+    if (isCabinetRunning && doorOpen) {
+      final now = DateTime.now();
+      if (!_wasDoorOpenDuringSterilization || 
+          (_lastDoorAlertTime != null && now.difference(_lastDoorAlertTime!).inMinutes >= 1)) {
+        _wasDoorOpenDuringSterilization = true;
+        _lastDoorAlertTime = now;
+
+        _triggerAlert(
+          id: NotificationService.idCabinetDoorSafety,
+          title: 'Cabinet Safety Alert ⚠️',
+          message: 'Cabinet door opened! Sterilization paused for safety. Please close the door.',
+          context: context,
+        );
+      }
+    } else if (!doorOpen) {
+      _wasDoorOpenDuringSterilization = false;
+    }
+
+    // =========================================================================
+    // RULE 5: Cabinet Sterilization Done (Fig 8)
+    // =========================================================================
+    if (cabinetStatus == 'Cleaning process is done' && _lastCabinetStatus != 'Cleaning process is done') {
+      _triggerAlert(
+        id: NotificationService.idCabinetCycle,
+        title: 'Cabinet Sterilization Complete ✅',
+        message: 'Cleaning process is done',
+        context: context,
+      );
+    }
+
+    // =========================================================================
+    // RULE 6: Shoe Sterilization Started (Fig 7)
+    // =========================================================================
     if (!_wasLeftSterilizing && leftIsSterilizing) {
-      _createAlert(uid, 'Sterilization in process', 'Left Shoe Sterilization', context);
+      _triggerAlert(
+        id: NotificationService.idLeftShoeSterilizing,
+        title: 'Smart Shoe Sanitization 👟',
+        message: 'Left Shoe: Sterilization in process',
+        context: context,
+      );
     }
     if (!_wasRightSterilizing && rightIsSterilizing) {
-      _createAlert(uid, 'Sterilization in process', 'Right Shoe Sterilization', context);
+      _triggerAlert(
+        id: NotificationService.idRightShoeSterilizing,
+        title: 'Smart Shoe Sanitization 👟',
+        message: 'Right Shoe: Sterilization in process',
+        context: context,
+      );
     }
 
-    // RULE 5: Shoe Sterilization Done (Send Message: "Cleaning process is done")
+    // =========================================================================
+    // RULE 7: Shoe Sterilization Done (Fig 7)
+    // =========================================================================
     if (_wasLeftSterilizing && !leftIsSterilizing) {
-      _createAlert(uid, 'Cleaning process is done', 'Left Shoe Sterilization', context);
+      _triggerAlert(
+        id: NotificationService.idLeftShoeSterilizing,
+        title: 'Smart Shoe Sanitization Complete ✅',
+        message: 'Left Shoe: Cleaning process is done',
+        context: context,
+      );
     }
     if (_wasRightSterilizing && !rightIsSterilizing) {
-      _createAlert(uid, 'Cleaning process is done', 'Right Shoe Sterilization', context);
+      _triggerAlert(
+        id: NotificationService.idRightShoeSterilizing,
+        title: 'Smart Shoe Sanitization Complete ✅',
+        message: 'Right Shoe: Cleaning process is done',
+        context: context,
+      );
     }
 
+    // Update state history
     _wasLeftSterilizing = leftIsSterilizing;
     _wasRightSterilizing = rightIsSterilizing;
     _lastCabinetStatus = cabinetStatus;
   }
 
   Future<void> _sendCommand(String uid, String cmd) async {
-    final snapshot = await _db.child('users/$uid/system_id').get();
-    if (snapshot.exists) {
-      final systemId = snapshot.value.toString();
-      await _db.child('devices/$systemId/cabinet/command').set(cmd);
+    try {
+      final snapshot = await _db.child('users/$uid/system_id').get();
+      if (snapshot.exists && snapshot.value != null) {
+        final systemId = snapshot.value.toString();
+        await _db.child('devices/$systemId/cabinet/command').set(cmd);
+      }
+    } catch (e) {
+      debugPrint('Error sending cabinet command: $e');
     }
   }
 
-  Future<void> _createAlert(String uid, String message, String title, BuildContext context) async {
-    final alertId = _db.child('users/$uid/alerts').push().key;
-    if (alertId == null) return;
+  Future<void> _triggerAlert({
+    required int id,
+    required String title,
+    required String message,
+    required BuildContext context,
+  }) async {
+    // 1. Android Heads-Up Notification (Sound + Vibration + Banner)
+    await _notificationService.showNotification(
+      id: id,
+      title: title,
+      body: message,
+    );
 
-    await _db.child('users/$uid/alerts/$alertId').set({
-      'title': title,
-      'message': message,
-      'timestamp': ServerValue.timestamp,
-    });
-    
-    if (!context.mounted) return;
-    _showInAppNotification(context, title, message);
+    // 2. Persist to Firebase Alerts Database
+    await _notificationService.logAlertToFirebase(
+      title: title,
+      message: message,
+    );
+
+    // 3. In-App Floating Notification Banner
+    if (context.mounted) {
+      _showInAppNotification(context, title, message);
+    }
   }
 
-
   void _showInAppNotification(BuildContext context, String title, String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        content: Row(
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text(message),
+            const Icon(Icons.notifications_active, color: Colors.white, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    message,
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color(0xFF1B2A4A),
         duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
